@@ -62,7 +62,8 @@ export const getWishlist = async (req, res) => {
     const items = await pool.query(
       `SELECT
         p.*,
-        w.id as wishlist_id
+        w.id as wishlist_id,
+        w.product_id
        FROM wishlist w
        JOIN products p ON w.product_id = p.id
        WHERE w.user_id = $1`,
@@ -100,3 +101,4 @@ export const removeFromWishlist = async (req, res) => {
   }
 
 };
+
