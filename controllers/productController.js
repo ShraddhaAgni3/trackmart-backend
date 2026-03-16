@@ -1,32 +1,55 @@
 import pool from "../config/db.js";
 
-/* ================= GET ALL PRODUCTS ================= */
-
 export const getProducts = async (req, res) => {
+
   try {
 
-    const products = await pool.query(
-      `SELECT 
+    const { search } = req.query;
+
+    let query = `
+      SELECT 
         p.*,
         c.name AS category_name,
-         c.benefits,
         v.business_name
-       FROM products p
-       LEFT JOIN categories c ON p.category_id = c.id
-       LEFT JOIN vendors v ON p.vendor_id = v.id
-       WHERE p.status='active'
-       ORDER BY p.created_at DESC`
-    );
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN vendors v ON p.vendor_id = v.id
+      WHERE p.status='active'
+    `;
+
+    const values = [];
+    let index = 1;
+
+    if (search) {
+
+      query += `
+        AND (
+          p.title ILIKE $${index}
+          OR p.description ILIKE $${index}
+          OR p.care_type ILIKE $${index}
+          OR p.concern_type ILIKE $${index}
+        )
+      `;
+
+      values.push(`%${search}%`);
+      index++;
+
+    }
+
+    query += ` ORDER BY p.created_at DESC`;
+
+    const products = await pool.query(query, values);
 
     res.json(products.rows);
 
   } catch (err) {
-    console.error(err);
+
+    console.log(err);
     res.status(500).json({ message: err.message });
+
   }
+
 };
-
-
 /* ================= CREATE PRODUCT ================= */
 
 export const createProduct = async (req, res) => {
