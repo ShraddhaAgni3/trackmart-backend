@@ -44,6 +44,8 @@ export const createProduct = async (req, res) => {
       size,
       category_id,
       calories,
+      care_type,
+  concern_type,
       sugar,
       fat,
       protein,
@@ -96,7 +98,7 @@ const ingredients_image =
       `INSERT INTO products
       (vendor_id,category_id,title,description,
        price,stock,size,delivery_charge,
-       calories,sugar,fat,protein,
+       calories,sugar,fat,protein,care_type,concern_type,
        ingredients,health_rating,how_to_use,making_process,
        image_url,ingredients_image_url)
        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
@@ -109,6 +111,8 @@ const ingredients_image =
         parsedPrice,
         parsedStock,
         parsedSize,
+        care_type,
+concern_type,
         parsedDelivery,
         parsedCalories,
         parsedSugar,
