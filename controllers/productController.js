@@ -93,39 +93,41 @@ export const createProduct = async (req, res) => {
 
 const ingredients_image =
   req.files?.ingredients_image?.[0]?.path || null;
-
-    const product = await pool.query(
-      `INSERT INTO products
-      (vendor_id,category_id,title,description,
-       price,stock,size,delivery_charge,
-       calories,sugar,fat,protein,care_type,concern_type,
-       ingredients,health_rating,how_to_use,making_process,
-       image_url,ingredients_image_url)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-       RETURNING *`,
-      [
-        vendor_id,
-        category_id,
-        title,
-        description,
-        parsedPrice,
-        parsedStock,
-        parsedSize,
-        care_type,
+const product = await pool.query(
+`INSERT INTO products
+(vendor_id,category_id,title,description,
+price,stock,size,delivery_charge,
+calories,sugar,fat,protein,
+care_type,concern_type,
+ingredients,health_rating,
+how_to_use,making_process,
+image_url,ingredients_image_url)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+RETURNING *`,
+[
+vendor_id,
+category_id,
+title,
+description,
+parsedPrice,
+parsedStock,
+parsedSize,
+parsedDelivery,
+parsedCalories,
+parsedSugar,
+parsedFat,
+parsedProtein,
+care_type,
 concern_type,
-        parsedDelivery,
-        parsedCalories,
-        parsedSugar,
-        how_to_use,
+ingredients,
+health_rating,
+how_to_use,
 making_process,
-        parsedFat,
-        parsedProtein,
-        ingredients,
-        health_rating,
-        product_image,
-        ingredients_image
-      ]
-    );
+product_image,
+ingredients_image
+]
+);
 
 
     /* ================= ADMIN NOTIFICATION ================= */
