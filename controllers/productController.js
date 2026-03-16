@@ -1,10 +1,9 @@
 import pool from "../config/db.js";
-
 export const getProducts = async (req, res) => {
 
   try {
 
-    const { search } = req.query;
+    const { search, category, care, concern, price, sort } = req.query;
 
     let query = `
       SELECT 
@@ -19,6 +18,8 @@ export const getProducts = async (req, res) => {
 
     const values = [];
     let index = 1;
+
+    /* SEARCH */
 
     if (search) {
 
@@ -36,7 +37,57 @@ export const getProducts = async (req, res) => {
 
     }
 
-    query += ` ORDER BY p.created_at DESC`;
+    /* CATEGORY */
+
+    if (category) {
+
+      query += ` AND p.category_id = $${index}`;
+      values.push(category);
+      index++;
+
+    }
+
+    /* CARE */
+
+    if (care) {
+
+      query += ` AND p.care_type ILIKE $${index}`;
+      values.push(`%${care}%`);
+      index++;
+
+    }
+
+    /* CONCERN */
+
+    if (concern) {
+
+      query += ` AND p.concern_type ILIKE $${index}`;
+      values.push(`%${concern}%`);
+      index++;
+
+    }
+
+    /* PRICE */
+
+    if (price) {
+
+      query += ` AND p.price <= $${index}`;
+      values.push(price);
+      index++;
+
+    }
+
+    /* SORT */
+
+    if (sort === "price_low") {
+      query += ` ORDER BY p.price ASC`;
+    }
+    else if (sort === "price_high") {
+      query += ` ORDER BY p.price DESC`;
+    }
+    else {
+      query += ` ORDER BY p.created_at DESC`;
+    }
 
     const products = await pool.query(query, values);
 
