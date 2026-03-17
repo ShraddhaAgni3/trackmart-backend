@@ -12,6 +12,7 @@ export const getProducts = async (req, res) => {
       SELECT 
         p.*,
         c.name AS category_name,
+        c.benefits AS benefits,
         v.business_name
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
