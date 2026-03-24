@@ -6,4 +6,5 @@ const router = express.Router();
 
 router.post("/", protect, createOrder);
 router.get("/", protect, getUserOrders);
+router.get("/vendor/orders/:id", protect, getVendorOrderDetails);
 export default router;
