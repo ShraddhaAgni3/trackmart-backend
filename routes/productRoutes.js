@@ -3,6 +3,7 @@ import {
   createProduct,
   getVendorProducts,
   deleteProduct,
+  getProductById,
   getProducts
 } from "../controllers/productController.js";
 
@@ -14,14 +15,8 @@ const router = express.Router();
 /* ================= GET ALL PRODUCTS (WITH SEARCH) ================= */
 
 router.get("/", getProducts);
+router.get("/:id", getProductById);
 
-/*
-Examples:
-
-GET /api/products
-GET /api/products?search=sea
-GET /api/products?search=immunity
-*/
 
 
 /* ================= GET VENDOR PRODUCTS ================= */
