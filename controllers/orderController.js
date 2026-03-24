@@ -1,5 +1,64 @@
 import pool from "../config/db.js";
+export const getVendorOrderDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
 
+    /* vendor id */
+    const vendor = await pool.query(
+      "SELECT id FROM vendors WHERE user_id=$1",
+      [userId]
+    );
+
+    if (!vendor.rows.length) {
+      return res.status(400).json({ message: "Vendor not found" });
+    }
+
+    const vendorId = vendor.rows[0].id;
+
+    /* order + customer + address */
+    const order = await pool.query(
+      `
+      SELECT 
+        o.*,
+        u.name AS customer_name,
+        u.phone,
+        a.*
+      FROM orders o
+      JOIN users u ON u.id = o.user_id
+      JOIN addresses a ON a.id = o.address_id
+      WHERE o.id = $1
+      `,
+      [id]
+    );
+
+    if (!order.rows.length) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    /* only this vendor items */
+    const items = await pool.query(
+      `
+      SELECT 
+        oi.*,
+        p.title
+      FROM order_items oi
+      JOIN products p ON p.id = oi.product_id
+      WHERE oi.order_id = $1 AND oi.vendor_id = $2
+      `,
+      [id, vendorId]
+    );
+
+    res.json({
+      order: order.rows[0],
+      items: items.rows
+    });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: err.message });
+  }
+};
 export const createOrder = async (req, res) => {
   try {
 
