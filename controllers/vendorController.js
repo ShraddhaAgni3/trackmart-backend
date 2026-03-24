@@ -164,7 +164,7 @@ oi.price_at_purchase,
 p.title
 FROM order_items oi
 JOIN products p ON oi.product_id=p.id
-WHERE oi.order_id=$1
+WHERE oi.order_id=$1 AND oi.vendor_id=$2
 `,
 [id]
 );
