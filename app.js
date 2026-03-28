@@ -27,7 +27,7 @@ app.use(cors({
 app.options("*", cors());
 
 app.use(express.json());
-app.use("/user", profileRoutes);
+app.use("/api/user", profileRoutes); // ✅ FIXED
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/customer", customerRoutes);
 app.use("/api/support", supportRoutes);
