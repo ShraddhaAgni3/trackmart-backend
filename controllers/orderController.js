@@ -72,7 +72,6 @@ address_id
           item.quantity,
           commission,
           earning,
-          "pending",
           "pending"
         ]
       );
