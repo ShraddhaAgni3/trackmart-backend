@@ -63,7 +63,7 @@ address_id
         `INSERT INTO order_items
         (order_id,product_id,vendor_id,price_at_purchase,quantity,
          commission_amount,vendor_earning,payout_status)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
         [
           orderId,
           item.product_id,
@@ -72,6 +72,7 @@ address_id
           item.quantity,
           commission,
           earning,
+          "pending",
           "pending"
         ]
       );
