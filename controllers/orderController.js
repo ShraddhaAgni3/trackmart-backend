@@ -115,7 +115,7 @@ address_id
       [userId]
     );
 
-    res.json({ message:"Order placed successfully" });
+  res.json({ message: "Order placed successfully", order_id: orderId });
 
   } catch (err) {
     console.log(err);
@@ -123,8 +123,26 @@ address_id
   }
 };
 
+export const updatePaymentStatus = async (req, res) => {
+  try {
+    const { order_id, payment_id } = req.body;
+    const userId = req.user.id;
 
+    await pool.query(
+      `UPDATE orders 
+       SET payment_status = 'paid',
+           payment_id = $1
+       WHERE id = $2 AND user_id = $3`,
+      [payment_id, order_id, userId]
+    );
 
+    res.json({ message: "Payment updated" });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: err.message });
+  }
+};
 export const getUserOrders = async (req, res) => {
   try {
 
