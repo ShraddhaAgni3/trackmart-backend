@@ -8,7 +8,7 @@ router.get("/stats", protect, getVendorStats);
 router.get("/orders", protect, getVendorOrders);
 router.get("/earnings", protect, getVendorEarnings);
 router.get("/orders/:id", protect, getVendorOrderDetails);
-router.put("/orders/:id/deliver", protect, markOrderDelivered);
+router.patch("/deliver-item", protect, markOrderDelivered);
 router.put("/orders/:id/confirm", protect, confirmVendorOrder);
 router.get("/payments",protect,getVendorPayments);
 
