@@ -297,30 +297,44 @@ res.status(500).json({message:err.message});
 
 
 /* ================= MARK DELIVERED ================= */
-export const markOrderDelivered = async (req,res)=>{
-
+export const markOrderDelivered = async (req, res) => {
   try {
 
     const { item_id } = req.body;
-    const vendorId = req.user.vendor_id;
 
-    // ✅ Step 1: sirf apna item update karo
-    await pool.query(
-      `UPDATE order_items
-       SET item_status='delivered'
-       WHERE id=$1 AND vendor_id=$2`,
+    // ✅ 1. Get vendorId properly (FIX)
+    const vendor = await pool.query(
+      "SELECT id FROM vendors WHERE user_id=$1",
+      [req.user.id]
+    );
+
+    if (!vendor.rows.length) {
+      return res.status(404).json({ message: "Vendor not found" });
+    }
+
+    const vendorId = vendor.rows[0].id;
+
+    // ✅ 2. Security check (item belongs to vendor)
+    const itemCheck = await pool.query(
+      `SELECT * FROM order_items WHERE id=$1 AND vendor_id=$2`,
       [item_id, vendorId]
     );
 
-    // ✅ Step 2: order_id nikalo
-    const itemRes = await pool.query(
-      `SELECT order_id FROM order_items WHERE id=$1`,
+    if (!itemCheck.rows.length) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    const orderId = itemCheck.rows[0].order_id;
+
+    // ✅ 3. Update item only
+    await pool.query(
+      `UPDATE order_items
+       SET item_status='delivered'
+       WHERE id=$1`,
       [item_id]
     );
 
-    const orderId = itemRes.rows[0].order_id;
-
-    // ✅ Step 3: check karo sab items delivered hai ya nahi
+    // ✅ 4. Check all items of order
     const items = await pool.query(
       `SELECT item_status FROM order_items WHERE order_id=$1`,
       [orderId]
@@ -330,7 +344,7 @@ export const markOrderDelivered = async (req,res)=>{
       i => i.item_status === "delivered"
     );
 
-    // ✅ Step 4: agar sab delivered → order update
+    // ✅ 5. If all delivered → update order
     if (allDelivered) {
 
       const orderCheck = await pool.query(
@@ -338,10 +352,13 @@ export const markOrderDelivered = async (req,res)=>{
         [orderId]
       );
 
-      const paymentMethod = orderCheck.rows[0].payment_method;
-      const userId = orderCheck.rows[0].user_id;
+      if (!orderCheck.rows.length) {
+        return res.status(404).json({ message: "Order not found" });
+      }
 
-      if (paymentMethod === "COD") {
+      const { payment_method, user_id } = orderCheck.rows[0];
+
+      if (payment_method === "COD") {
         await pool.query(
           `UPDATE orders
            SET order_status='delivered',
@@ -360,12 +377,12 @@ export const markOrderDelivered = async (req,res)=>{
         );
       }
 
-      // ✅ Notification (only when full order done)
+      // ✅ Notification (only once when full order done)
       await pool.query(
         `INSERT INTO notifications (user_id,title,message,type)
          VALUES ($1,$2,$3,$4)`,
         [
-          userId,
+          user_id,
           "Order Delivered",
           "Your order has been delivered successfully",
           "order"
@@ -376,10 +393,9 @@ export const markOrderDelivered = async (req,res)=>{
     res.json({ message: "Item delivered updated" });
 
   } catch (err) {
-    console.log(err);
+    console.log("🔥 ERROR:", err);
     res.status(500).json({ message: err.message });
   }
-
 };
 export const getVendorPayments = async (req,res)=>{
 
