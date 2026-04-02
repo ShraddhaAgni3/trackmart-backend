@@ -125,21 +125,35 @@ address_id
 
 export const updatePaymentStatus = async (req, res) => {
   try {
-    const { order_id, payment_id } = req.body;
-    const userId = req.user.id;
 
-    await pool.query(
+    const { order_id, payment_id } = req.body;
+
+    console.log("UPDATE PAYMENT:", order_id, payment_id);
+
+    const result = await pool.query(
       `UPDATE orders 
        SET payment_status = 'paid',
            payment_id = $1
-       WHERE id = $2 AND user_id = $3`,
-      [payment_id, order_id, userId]
+       WHERE id = $2
+       RETURNING *`,
+      [payment_id, order_id]
     );
 
-    res.json({ message: "Payment updated" });
+    if (result.rowCount === 0) {
+      return res.status(400).json({
+        message: "Order not found"
+      });
+    }
+
+    console.log("UPDATED ORDER:", result.rows[0]);
+
+    res.json({
+      message: "Payment updated",
+      order: result.rows[0]
+    });
 
   } catch (err) {
-    console.log(err);
+    console.log("PAYMENT UPDATE ERROR:", err);
     res.status(500).json({ message: err.message });
   }
 };
