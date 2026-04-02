@@ -203,98 +203,105 @@ res.status(500).json({message:err.message});
 
 
 /* ================= CONFIRM ORDER ================= */
-export const confirmVendorOrder = async (req,res)=>{
+export const confirmVendorOrder = async (req, res) => {
+  try {
 
-try{
+    const { id } = req.params;
+    const { delivery_date } = req.body;
 
-const { id } = req.params;
-const { delivery_date } = req.body;
+    const today = new Date().toISOString().split("T")[0];
 
-const today = new Date().toISOString().split("T")[0];
+    if (delivery_date < today) {
+      return res.status(400).json({
+        message: "Delivery date cannot be in the past"
+      });
+    }
 
-if(delivery_date < today){
-return res.status(400).json({
-message:"Delivery date cannot be in the past"
-});
-}
+    // ✅ 1. get vendorId
+    const vendor = await pool.query(
+      "SELECT id FROM vendors WHERE user_id=$1",
+      [req.user.id]
+    );
 
-/* UPDATE ORDER */
+    if (!vendor.rows.length) {
+      return res.status(404).json({ message: "Vendor not found" });
+    }
 
-await pool.query(
-`
-UPDATE orders
-SET order_status='confirmed',
-delivery_date=$1
-WHERE id=$2
-`,
-[delivery_date,id]
-);
+    const vendorId = vendor.rows[0].id;
 
-/* GET USER */
+    // ✅ 2. check order belongs to vendor
+    const check = await pool.query(
+      `SELECT * FROM order_items 
+       WHERE order_id=$1 AND vendor_id=$2`,
+      [id, vendorId]
+    );
 
-const orderUser = await pool.query(
-"SELECT user_id FROM orders WHERE id=$1",
-[id]
-);
+    if (!check.rows.length) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
 
-const userId = orderUser.rows[0].user_id;
+    // ✅ 3. update order (only if allowed)
+    await pool.query(
+      `UPDATE orders
+       SET order_status='confirmed',
+           delivery_date=$1
+       WHERE id=$2`,
+      [delivery_date, id]
+    );
 
-/* NOTIFICATION */
+    // ✅ 4. get user
+    const orderUser = await pool.query(
+      "SELECT user_id FROM orders WHERE id=$1",
+      [id]
+    );
 
-await pool.query(
-`
-INSERT INTO notifications (user_id,title,message,type)
-VALUES ($1,$2,$3,$4)
-`,
-[
-userId,
-"Order Confirmed",
-"Vendor confirmed your order",
-"order"
-]
-);
+    const userId = orderUser.rows[0].user_id;
 
-/* 🔥 FULL ORDER DATA (FIX) */
+    // ✅ 5. notification
+    await pool.query(
+      `INSERT INTO notifications (user_id,title,message,type)
+       VALUES ($1,$2,$3,$4)`,
+      [
+        userId,
+        "Order Confirmed",
+        "Vendor confirmed your order",
+        "order"
+      ]
+    );
 
-const updated = await pool.query(
-`
-SELECT 
-o.id,
-o.order_status,
-o.delivery_date,
-o.user_id,
-u.name AS customer_name,
-u.id AS customer_id,
-a.phone,
-a.house_no,
-a.street,
-a.locality,
-a.city,
-a.state,
-a.pincode
-FROM orders o
-JOIN users u ON o.user_id=u.id
-JOIN addresses a ON o.address_id=a.id
-WHERE o.id=$1
-`,
-[id]
-);
+    // ✅ 6. return updated order
+    const updated = await pool.query(
+      `SELECT 
+        o.id,
+        o.order_status,
+        o.delivery_date,
+        o.user_id,
+        u.name AS customer_name,
+        u.id AS customer_id,
+        a.phone,
+        a.house_no,
+        a.street,
+        a.locality,
+        a.city,
+        a.state,
+        a.pincode
+      FROM orders o
+      JOIN users u ON o.user_id=u.id
+      JOIN addresses a ON o.address_id=a.id
+      WHERE o.id=$1`,
+      [id]
+    );
 
-res.json({
-message:"Order confirmed",
-order: updated.rows[0]
-});
+    res.json({
+      message: "Order confirmed",
+      order: updated.rows[0]
+    });
 
-}catch(err){
-
-console.log(err);
-res.status(500).json({message:err.message});
-
-}
-
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: err.message });
+  }
 };
-
-
 
 /* ================= MARK DELIVERED ================= */
 export const markOrderDelivered = async (req, res) => {
