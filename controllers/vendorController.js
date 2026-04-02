@@ -299,107 +299,86 @@ res.status(500).json({message:err.message});
 /* ================= MARK DELIVERED ================= */
 export const markOrderDelivered = async (req,res)=>{
 
-try{
+  try {
 
-const { id } = req.params;
+    const { item_id } = req.body;
+    const vendorId = req.user.vendor_id;
 
-const orderCheck = await pool.query(
-`SELECT payment_method,user_id FROM orders WHERE id=$1`,
-[id]
-);
+    // ✅ Step 1: sirf apna item update karo
+    await pool.query(
+      `UPDATE order_items
+       SET item_status='delivered'
+       WHERE id=$1 AND vendor_id=$2`,
+      [item_id, vendorId]
+    );
 
-const paymentMethod = orderCheck.rows[0].payment_method;
-const userId = orderCheck.rows[0].user_id;
+    // ✅ Step 2: order_id nikalo
+    const itemRes = await pool.query(
+      `SELECT order_id FROM order_items WHERE id=$1`,
+      [item_id]
+    );
 
+    const orderId = itemRes.rows[0].order_id;
 
-/* COD → PAYMENT PAID */
+    // ✅ Step 3: check karo sab items delivered hai ya nahi
+    const items = await pool.query(
+      `SELECT item_status FROM order_items WHERE order_id=$1`,
+      [orderId]
+    );
 
-if(paymentMethod === "COD"){
+    const allDelivered = items.rows.every(
+      i => i.item_status === "delivered"
+    );
 
-await pool.query(
-`
-UPDATE orders
-SET 
-order_status='delivered',
-payment_status='paid',
-delivered_at=NOW()
-WHERE id=$1
-`,
-[id]
-);
+    // ✅ Step 4: agar sab delivered → order update
+    if (allDelivered) {
 
-}
+      const orderCheck = await pool.query(
+        `SELECT payment_method,user_id FROM orders WHERE id=$1`,
+        [orderId]
+      );
 
-/* ONLINE → ONLY DELIVERED */
+      const paymentMethod = orderCheck.rows[0].payment_method;
+      const userId = orderCheck.rows[0].user_id;
 
-else{
+      if (paymentMethod === "COD") {
+        await pool.query(
+          `UPDATE orders
+           SET order_status='delivered',
+               payment_status='paid',
+               delivered_at=NOW()
+           WHERE id=$1`,
+          [orderId]
+        );
+      } else {
+        await pool.query(
+          `UPDATE orders
+           SET order_status='delivered',
+               delivered_at=NOW()
+           WHERE id=$1`,
+          [orderId]
+        );
+      }
 
-await pool.query(
-`
-UPDATE orders
-SET 
-order_status='delivered',
-delivered_at=NOW()
-WHERE id=$1
-`,
-[id]
-);
+      // ✅ Notification (only when full order done)
+      await pool.query(
+        `INSERT INTO notifications (user_id,title,message,type)
+         VALUES ($1,$2,$3,$4)`,
+        [
+          userId,
+          "Order Delivered",
+          "Your order has been delivered successfully",
+          "order"
+        ]
+      );
+    }
 
-}
+    res.json({ message: "Item delivered updated" });
 
-
-/* NOTIFICATION */
-
-await pool.query(
-`
-INSERT INTO notifications (user_id,title,message,type)
-VALUES ($1,$2,$3,$4)
-`,
-[
-userId,
-"Order Delivered",
-"Your order has been delivered successfully",
-"order"
-]
-);
-
-/* 🔥 FULL ORDER DATA (FIX) */
-
-const updated = await pool.query(
-`
-SELECT 
-o.id,
-o.order_status,
-o.delivery_date,
-o.user_id,
-u.name AS customer_name,
-u.id AS customer_id,
-a.phone,
-a.house_no,
-a.street,
-a.locality,
-a.city,
-a.state,
-a.pincode
-FROM orders o
-JOIN users u ON o.user_id=u.id
-JOIN addresses a ON o.address_id=a.id
-WHERE o.id=$1
-`,
-[id]
-);
-
-res.json({
-message:"Order delivered",
-order: updated.rows[0]
-});
-
-}catch(err){
-
-console.log(err);
-res.status(500).json({message:err.message});
-
-}
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: err.message });
+  }
 
 };
 export const getVendorPayments = async (req,res)=>{
