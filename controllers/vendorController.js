@@ -62,7 +62,8 @@ export const getVendorOrders = async (req, res) => {
     const orders = await pool.query(
       `SELECT 
         o.id AS order_id,
-        o.order_status,
+         oi.item_status,  
+      
         o.created_at,
         oi.quantity,
         oi.vendor_earning,
