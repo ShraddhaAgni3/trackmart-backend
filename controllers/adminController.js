@@ -358,7 +358,7 @@ try{
 const orders = await pool.query(`
 SELECT
 o.id AS order_id,
-o.order_status,
+oi.item_status AS order_status,   -- 🔥 FIX
 o.created_at,
 v.business_name,
 p.title AS product_name,
