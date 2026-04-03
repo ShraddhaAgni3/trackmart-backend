@@ -178,6 +178,7 @@ SELECT
 oi.id,
 oi.quantity,
 oi.item_status,
+oi.delivery_date,
 oi.price_at_purchase,
 p.title
 FROM order_items oi
