@@ -158,11 +158,10 @@ a.street,
 a.locality,
 a.city,
 a.state,
-oi.item_status,
 a.pincode
 FROM orders o
 JOIN users u ON o.user_id=u.id
-LEFT JOIN addresses a ON o.address_id=a.id   -- ✅ FIX
+LEFT JOIN addresses a ON o.address_id=a.id
 WHERE o.id=$1
 `,
 [id]
@@ -178,6 +177,7 @@ const items = await pool.query(
 SELECT 
 oi.id,
 oi.quantity,
+oi.item_status,
 oi.price_at_purchase,
 p.title
 FROM order_items oi
