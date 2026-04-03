@@ -158,6 +158,7 @@ a.street,
 a.locality,
 a.city,
 a.state,
+oi.item_status,
 a.pincode
 FROM orders o
 JOIN users u ON o.user_id=u.id
