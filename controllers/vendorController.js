@@ -203,99 +203,45 @@ res.status(500).json({message:err.message});
 
 
 /* ================= CONFIRM ORDER ================= */
-export const confirmVendorOrder = async (req, res) => {
+export const confirmItem = async (req, res) => {
   try {
 
-    const { id } = req.params;
-    const { delivery_date } = req.body;
+    const { item_id, delivery_date } = req.body;
 
     const today = new Date().toISOString().split("T")[0];
 
     if (delivery_date < today) {
       return res.status(400).json({
-        message: "Delivery date cannot be in the past"
+        message: "Invalid delivery date"
       });
     }
 
-    // ✅ 1. get vendorId
     const vendor = await pool.query(
       "SELECT id FROM vendors WHERE user_id=$1",
       [req.user.id]
     );
 
-    if (!vendor.rows.length) {
-      return res.status(404).json({ message: "Vendor not found" });
-    }
-
     const vendorId = vendor.rows[0].id;
 
-    // ✅ 2. check order belongs to vendor
-    const check = await pool.query(
+    const itemCheck = await pool.query(
       `SELECT * FROM order_items 
-       WHERE order_id=$1 AND vendor_id=$2`,
-      [id, vendorId]
+       WHERE id=$1 AND vendor_id=$2`,
+      [item_id, vendorId]
     );
 
-    if (!check.rows.length) {
+    if (!itemCheck.rows.length) {
       return res.status(403).json({ message: "Not allowed" });
     }
 
-    // ✅ 3. update order (only if allowed)
     await pool.query(
-      `UPDATE orders
-       SET order_status='confirmed',
+      `UPDATE order_items
+       SET item_status='confirmed',
            delivery_date=$1
        WHERE id=$2`,
-      [delivery_date, id]
+      [delivery_date, item_id]
     );
 
-    // ✅ 4. get user
-    const orderUser = await pool.query(
-      "SELECT user_id FROM orders WHERE id=$1",
-      [id]
-    );
-
-    const userId = orderUser.rows[0].user_id;
-
-    // ✅ 5. notification
-    await pool.query(
-      `INSERT INTO notifications (user_id,title,message,type)
-       VALUES ($1,$2,$3,$4)`,
-      [
-        userId,
-        "Order Confirmed",
-        "Vendor confirmed your order",
-        "order"
-      ]
-    );
-
-    // ✅ 6. return updated order
-    const updated = await pool.query(
-      `SELECT 
-        o.id,
-        o.order_status,
-        o.delivery_date,
-        o.user_id,
-        u.name AS customer_name,
-        u.id AS customer_id,
-        a.phone,
-        a.house_no,
-        a.street,
-        a.locality,
-        a.city,
-        a.state,
-        a.pincode
-      FROM orders o
-      JOIN users u ON o.user_id=u.id
-      JOIN addresses a ON o.address_id=a.id
-      WHERE o.id=$1`,
-      [id]
-    );
-
-    res.json({
-      message: "Order confirmed",
-      order: updated.rows[0]
-    });
+    res.json({ message: "Item confirmed" });
 
   } catch (err) {
     console.log(err);
