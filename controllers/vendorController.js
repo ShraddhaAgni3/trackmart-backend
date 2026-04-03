@@ -209,6 +209,14 @@ export const confirmItem = async (req, res) => {
 
     const { item_id, delivery_date } = req.body;
 
+    if (!item_id) {
+      return res.status(400).json({ message: "item_id required" });
+    }
+
+    if (!delivery_date) {
+      return res.status(400).json({ message: "Delivery date required" });
+    }
+
     const today = new Date().toISOString().split("T")[0];
 
     if (delivery_date < today) {
@@ -221,6 +229,10 @@ export const confirmItem = async (req, res) => {
       "SELECT id FROM vendors WHERE user_id=$1",
       [req.user.id]
     );
+
+    if (!vendor.rows.length) {
+      return res.status(404).json({ message: "Vendor not found" });
+    }
 
     const vendorId = vendor.rows[0].id;
 
@@ -245,7 +257,7 @@ export const confirmItem = async (req, res) => {
     res.json({ message: "Item confirmed" });
 
   } catch (err) {
-    console.log(err);
+    console.log("🔥 ERROR:", err);
     res.status(500).json({ message: err.message });
   }
 };
