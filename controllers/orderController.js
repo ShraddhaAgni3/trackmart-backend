@@ -173,17 +173,20 @@ export const getUserOrders = async (req, res) => {
     const result = [];
 
     for (const order of orders.rows) {
-
-      const items = await pool.query(
-        `SELECT 
-          oi.*,
-          p.title AS product_title,
-          p.health_rating
-        FROM order_items oi
-        JOIN products p ON p.id = oi.product_id
-        WHERE oi.order_id = $1`,
-        [order.id]
-      );
+const items = await pool.query(
+  `SELECT 
+    oi.id,
+    oi.quantity,
+    oi.item_status,       -- 🔥 IMPORTANT
+    oi.delivery_date,     -- 🔥 IMPORTANT
+    oi.price_at_purchase,
+    p.title AS product_title,
+    p.health_rating
+  FROM order_items oi
+  JOIN products p ON p.id = oi.product_id
+  WHERE oi.order_id = $1`,
+  [order.id]
+);
 
       result.push({
         ...order,
