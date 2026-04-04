@@ -66,6 +66,8 @@ export const createVendorOrder = async (req, res) => {
   try {
     const { vendorId } = req.body;
 
+    console.log("vendorId:", vendorId);
+
     const result = await pool.query(
       `SELECT COALESCE(SUM(vendor_earning),0) AS total
        FROM order_items
@@ -75,9 +77,13 @@ export const createVendorOrder = async (req, res) => {
       [vendorId]
     );
 
+    console.log("DB result:", result.rows);
+
     const amount = Number(result.rows[0].total);
 
-    if (amount <= 0) {
+    console.log("amount:", amount);
+
+    if (!amount || amount <= 0) {
       return res.status(400).json({
         success: false,
         message: "No pending payout"
@@ -87,12 +93,10 @@ export const createVendorOrder = async (req, res) => {
     const order = await razorpay.orders.create({
       amount: amount * 100,
       currency: "INR",
-      receipt: `vendor_${vendorId}_${Date.now()}`,
-      notes: {
-        type: "vendor",
-        vendorId
-      }
+      receipt: `vendor_${vendorId}_${Date.now()}`
     });
+
+    console.log("Razorpay order:", order);
 
     res.json({
       success: true,
@@ -101,12 +105,13 @@ export const createVendorOrder = async (req, res) => {
     });
 
   } catch (err) {
-    console.log(err);
-    res.status(500).json({ success: false });
+    console.log("🔥 FULL ERROR:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
   }
 };
-
-
 
 /* VERIFY VENDOR PAYMENT */
 export const verifyVendorPayment = async (req, res) => {
