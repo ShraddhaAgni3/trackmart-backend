@@ -91,10 +91,12 @@ export const createVendorOrder = async (req, res) => {
     }
 
     const order = await razorpay.orders.create({
-      amount: amount * 100,
-      currency: "INR",
-      receipt: `vendor_${vendorId}_${Date.now()}`
-    });
+  amount: Math.round(amount * 100),   // ✅ decimal fix
+  currency: "INR",
+
+  // ✅ receipt short rakho (max 40 chars)
+  receipt: `v_${vendorId.slice(0, 8)}`
+});
 
     console.log("Razorpay order:", order);
 
