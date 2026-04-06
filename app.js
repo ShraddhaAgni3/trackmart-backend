@@ -14,7 +14,7 @@ import supportRoutes from "./routes/supportRoutes.js";
 import customerRoutes from "./routes/customerRoutes.js";
 import paymentRoutes from "./routes/payment.js";
 import profileRoutes from "./routes/profileRoutes.js";
-
+import contactRoutes from "./routes/contactRoutes.js";
 const app = express();
 
 app.use(cors({
@@ -31,6 +31,7 @@ app.options("*", cors());
 app.use(express.json());
 app.use("/api/payment", paymentRoutes);
 app.use("/api/user", profileRoutes);
+app.use("/api/contact", contactRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/customer", customerRoutes);
 app.use("/api/support", supportRoutes);
