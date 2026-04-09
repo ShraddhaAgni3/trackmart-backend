@@ -259,19 +259,26 @@ export const confirmItem = async (req, res) => {
 
     // ✅ get user email
     const userData = await client.query(
-      `SELECT u.email 
-       FROM orders o
-       JOIN users u ON o.user_id=u.id
-       JOIN order_items oi ON oi.order_id=o.id
-       WHERE oi.id=$1`,
-      [item_id]
-    );
+  `SELECT 
+     u.email,
+     o.id as order_id,
+     p.title as product_title
+   FROM orders o
+   JOIN users u ON o.user_id=u.id
+   JOIN order_items oi ON oi.order_id=o.id
+   JOIN products p ON oi.product_id=p.id
+   WHERE oi.id=$1`,
+  [item_id]
+);
 
     if (!userData.rows.length) {
       throw new Error("User email not found");
     }
 
     const email = userData.rows[0].email;
+    const email = userData.rows[0].email;
+const orderId = userData.rows[0].order_id;
+const productTitle = userData.rows[0].product_title;
     console.log("📧 Sending OTP to:", email);
 
     // ✅ generate OTP
@@ -300,7 +307,16 @@ export const confirmItem = async (req, res) => {
       await sendEmail({
         to: email,
         subject: "Delivery OTP",
-        text: `Your OTP for delivery is ${otp}`
+        text: `
+Your OTP is: ${otp}
+
+Order ID: ${orderId.toString().slice(0,8)}
+Product: ${productTitle}
+
+Please share this OTP with delivery partner to receive your order.
+
+- TrackMart
+`
       });
     } catch (emailErr) {
       console.log("📧 Email failed:", emailErr.message);
