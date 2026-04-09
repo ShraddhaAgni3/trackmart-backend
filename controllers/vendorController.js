@@ -272,6 +272,7 @@ export const confirmItem = async (req, res) => {
     }
 
     const email = userData.rows[0].email;
+    console.log("📧 Sending OTP to:", email);
 
     // ✅ generate OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
