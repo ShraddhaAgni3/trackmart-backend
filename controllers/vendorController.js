@@ -275,7 +275,7 @@ export const confirmItem = async (req, res) => {
       throw new Error("User email not found");
     }
 
-    const email = userData.rows[0].email;
+   
     const email = userData.rows[0].email;
 const orderId = userData.rows[0].order_id;
 const productTitle = userData.rows[0].product_title;
