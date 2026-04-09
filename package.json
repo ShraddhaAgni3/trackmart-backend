@@ -18,6 +18,7 @@
     "multer-storage-cloudinary": "^4.0.0",
     "pg": "^8.11.3",
     "razorpay": "^2.9.6",
+    "resend": "^3.2.0",
     "uuid": "^9.0.1"
   }
 }
