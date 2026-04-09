@@ -242,15 +242,20 @@ export const confirmItem = async (req, res) => {
     const vendorId = vendor.rows[0].id;
 
     // ✅ check item
-    const itemCheck = await client.query(
-      `SELECT * FROM order_items 
-       WHERE id=$1 AND vendor_id=$2`,
-      [item_id, vendorId]
-    );
+   const itemCheck = await client.query(
+  `SELECT * FROM order_items 
+   WHERE id=$1 AND vendor_id=$2`,
+  [item_id, vendorId]
+);
 
-    if (!itemCheck.rows.length) {
-      throw new Error("Not allowed");
-    }
+if (!itemCheck.rows.length) {
+  throw new Error("Not allowed");
+}
+
+// 🔥 ADD HERE
+if (itemCheck.rows[0].item_status === "confirmed") {
+  throw new Error("Item already confirmed");
+}
 
     // ✅ get user email FIRST (important)
     const userData = await client.query(
