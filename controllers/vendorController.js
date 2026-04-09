@@ -208,7 +208,7 @@ res.status(500).json({message:err.message});
 /* ================= CONFIRM ORDER ================= */
 
 export const confirmItem = async (req, res) => {
-  const client = await pool.connect(); // 🔥 transaction start
+  const client = await pool.connect();
 
   try {
     const { item_id, delivery_date } = req.body;
@@ -242,22 +242,22 @@ export const confirmItem = async (req, res) => {
     const vendorId = vendor.rows[0].id;
 
     // ✅ check item
-   const itemCheck = await client.query(
-  `SELECT * FROM order_items 
-   WHERE id=$1 AND vendor_id=$2`,
-  [item_id, vendorId]
-);
+    const itemCheck = await client.query(
+      `SELECT * FROM order_items 
+       WHERE id=$1 AND vendor_id=$2`,
+      [item_id, vendorId]
+    );
 
-if (!itemCheck.rows.length) {
-  throw new Error("Not allowed");
-}
+    if (!itemCheck.rows.length) {
+      throw new Error("Not allowed");
+    }
 
-// 🔥 ADD HERE
-if (itemCheck.rows[0].item_status === "confirmed") {
-  throw new Error("Item already confirmed");
-}
+    // ❌ already confirmed
+    if (itemCheck.rows[0].item_status === "confirmed") {
+      throw new Error("Item already confirmed");
+    }
 
-    // ✅ get user email FIRST (important)
+    // ✅ get user email
     const userData = await client.query(
       `SELECT u.email 
        FROM orders o
@@ -276,9 +276,12 @@ if (itemCheck.rows[0].item_status === "confirmed") {
     // ✅ generate OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
+    const hashedOtp = crypto
+      .createHash("sha256")
+      .update(otp)
+      .digest("hex");
 
-    // ✅ update item (confirm + otp together)
+    // ✅ DB update
     await client.query(
       `UPDATE order_items
        SET item_status='confirmed',
@@ -289,23 +292,29 @@ if (itemCheck.rows[0].item_status === "confirmed") {
       [delivery_date, hashedOtp, item_id]
     );
 
-    // ✅ send email (IMPORTANT: inside try)
-    await sendEmail({
-      to: email,
-      subject: "Delivery OTP",
-      text: `Your OTP for delivery is ${otp}`
-    });
+    await client.query("COMMIT"); // 🔥 COMMIT FIRST
 
-    await client.query("COMMIT");
+    // 🔥 EMAIL AFTER COMMIT (IMPORTANT)
+    try {
+      await sendEmail({
+        to: email,
+        subject: "Delivery OTP",
+        text: `Your OTP for delivery is ${otp}`
+      });
+    } catch (emailErr) {
+      console.log("📧 Email failed:", emailErr.message);
+      // ❗ order already confirmed, so ignore email failure
+    }
 
     res.json({ message: "Item confirmed & OTP sent" });
 
   } catch (err) {
-    await client.query("ROLLBACK"); // ❌ rollback everything
+    await client.query("ROLLBACK");
 
     console.log("🔥 ERROR:", err);
+
     res.status(500).json({
-      message: err.message || "Failed to confirm item with OTP"
+      message: err.message || "Failed to confirm item"
     });
 
   } finally {
