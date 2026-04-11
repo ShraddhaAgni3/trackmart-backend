@@ -48,9 +48,23 @@ export const getItemTracking = async (req, res) => {
     }
 
     // vendor access
-    if (user.role === "vendor" && data.vendor_id !== user.vendor_id) {
-      return res.status(403).json({ message: "Not allowed" });
-    }
+    if (user.role === "vendor") {
+
+  const vendor = await pool.query(
+    "SELECT id FROM vendors WHERE user_id=$1",
+    [user.id]
+  );
+
+  if (!vendor.rows.length) {
+    return res.status(403).json({ message: "Vendor not found" });
+  }
+
+  const vendorId = vendor.rows[0].id;
+
+  if (data.vendor_id !== vendorId) {
+    return res.status(403).json({ message: "Not allowed" });
+  }
+}
 
     // ✅ clean response
     return res.json({
