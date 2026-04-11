@@ -1,0 +1,10 @@
+import express from "express";
+import { getItemTracking } from "../controllers/trackController.js";
+import { protect } from "../middleware/auth.js";
+
+const router = express.Router();
+
+// 🔥 COMMON ROUTE FOR ALL
+router.get("/:itemId", protect, getItemTracking);
+
+export default router;
