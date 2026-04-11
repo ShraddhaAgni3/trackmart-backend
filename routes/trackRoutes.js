@@ -1,5 +1,5 @@
 import express from "express";
-import { getItemTracking } from "../controllers/trackController.js";
+import { getItemTracking, updateLocation } from "../controllers/trackController.js";
 import { protect } from "../middleware/auth.js";
 
 const router = express.Router();
