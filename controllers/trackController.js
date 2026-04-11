@@ -1,10 +1,12 @@
 import pool from "../config/db.js";
 
+/* ================= GET TRACKING ================= */
+
 export const getItemTracking = async (req, res) => {
   try {
     const { itemId } = req.params;
 
-    // ✅ validation
+    //  validation
     if (!itemId) {
       return res.status(400).json({ message: "Item ID required" });
     }
@@ -16,11 +18,16 @@ export const getItemTracking = async (req, res) => {
         oi.item_status,
         oi.delivery_date,
         oi.latitude,
-oi.longitude,
+        oi.longitude,
         oi.vendor_id,
+
         o.user_id,
+        o.latitude AS user_lat,     
+        o.longitude AS user_lng,   
+
         p.title,
         v.business_name AS vendor_name
+
       FROM order_items oi
       JOIN orders o ON o.id = oi.order_id
       JOIN products p ON p.id = oi.product_id
@@ -52,31 +59,37 @@ oi.longitude,
     // vendor access
     if (user.role === "vendor") {
 
-  const vendor = await pool.query(
-    "SELECT id FROM vendors WHERE user_id=$1",
-    [user.id]
-  );
+      const vendor = await pool.query(
+        "SELECT id FROM vendors WHERE user_id=$1",
+        [user.id]
+      );
 
-  if (!vendor.rows.length) {
-    return res.status(403).json({ message: "Vendor not found" });
-  }
+      if (!vendor.rows.length) {
+        return res.status(403).json({ message: "Vendor not found" });
+      }
 
-  const vendorId = vendor.rows[0].id;
+      const vendorId = vendor.rows[0].id;
 
-  if (data.vendor_id !== vendorId) {
-    return res.status(403).json({ message: "Not allowed" });
-  }
-}
+      if (data.vendor_id !== vendorId) {
+        return res.status(403).json({ message: "Not allowed" });
+      }
+    }
 
-    // ✅ clean response
+    // ✅ FINAL RESPONSE
     return res.json({
       item_id: data.item_id,
       status: data.item_status,
       delivery_date: data.delivery_date,
       vendor_name: data.vendor_name,
       title: data.title,
-      latitude: data.latitude,      // 🔥 ADD
-  longitude: data.longitude   
+
+      // 🚚 delivery boy location
+      latitude: data.latitude,
+      longitude: data.longitude,
+
+      // 🏠 user location (for route)
+      user_lat: data.user_lat,
+      user_lng: data.user_lng
     });
 
   } catch (err) {
@@ -87,7 +100,10 @@ oi.longitude,
     });
   }
 };
-// controllers/trackController.js
+
+
+
+/* ================= UPDATE LOCATION ================= */
 
 export const updateLocation = async (req, res) => {
   try {
@@ -98,9 +114,12 @@ export const updateLocation = async (req, res) => {
     }
 
     await pool.query(
-      `UPDATE order_items
-       SET latitude=$1, longitude=$2
-       WHERE id=$3`,
+      `
+      UPDATE order_items
+      SET latitude = $1,
+          longitude = $2
+      WHERE id = $3
+      `,
       [lat, lng, item_id]
     );
 
