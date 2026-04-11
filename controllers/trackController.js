@@ -1,12 +1,18 @@
 import pool from "../config/db.js";
+
 export const getItemTracking = async (req, res) => {
   try {
     const { itemId } = req.params;
 
-    const item = await pool.query(
+    // ✅ validation
+    if (!itemId) {
+      return res.status(400).json({ message: "Item ID required" });
+    }
+
+    const result = await pool.query(
       `
       SELECT 
-       oi.id AS item_id,
+        oi.id AS item_id,
         oi.item_status,
         oi.delivery_date,
         oi.vendor_id,
@@ -22,30 +28,44 @@ export const getItemTracking = async (req, res) => {
       [itemId]
     );
 
-    if (!item.rows.length) {
+    // ❌ not found
+    if (result.rows.length === 0) {
       return res.status(404).json({ message: "Item not found" });
     }
 
-    const data = item.rows[0];
+    const data = result.rows[0];
 
-    /* 🔐 ACCESS CONTROL */
-
+    // 🔐 ACCESS CONTROL
     const user = req.user;
 
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // user access
     if (user.role === "user" && data.user_id !== user.id) {
       return res.status(403).json({ message: "Not allowed" });
     }
 
+    // vendor access
     if (user.role === "vendor" && data.vendor_id !== user.vendor_id) {
       return res.status(403).json({ message: "Not allowed" });
     }
 
-    // admin → full access
-
-    res.json(data);
+    // ✅ clean response
+    return res.json({
+      item_id: data.item_id,
+      status: data.item_status,
+      delivery_date: data.delivery_date,
+      vendor_name: data.vendor_name,
+      title: data.title
+    });
 
   } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: err.message });
+    console.error("TRACK ERROR:", err);
+    return res.status(500).json({
+      message: "Server error",
+      error: err.message
+    });
   }
 };
