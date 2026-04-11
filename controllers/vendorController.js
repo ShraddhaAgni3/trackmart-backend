@@ -253,21 +253,21 @@ export const confirmItem = async (req, res) => {
     }
 
     // ❌ already confirmed
-    if (itemCheck.rows[0].item_status === "confirmed") {
-      throw new Error("Item already confirmed");
-    }
+    if (["confirmed", "delivered"].includes(itemCheck.rows[0].item_status)) {
+  throw new Error("Item already processed");
+}
 
     // ✅ get user email
     const userData = await client.query(
   `SELECT 
-     u.email,
-     o.id as order_id,
-     p.title as product_title
-   FROM orders o
-   JOIN users u ON o.user_id=u.id
-   JOIN order_items oi ON oi.order_id=o.id
-   JOIN products p ON oi.product_id=p.id
-   WHERE oi.id=$1`,
+  u.email,
+  o.id as order_id,
+  p.title as product_title
+FROM order_items oi
+JOIN orders o ON oi.order_id=o.id
+JOIN users u ON o.user_id=u.id
+JOIN products p ON oi.product_id=p.id
+WHERE oi.id=$1`,
   [item_id]
 );
 
