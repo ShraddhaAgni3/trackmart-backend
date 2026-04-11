@@ -17,13 +17,12 @@ export const getItemTracking = async (req, res) => {
         oi.id AS item_id,
         oi.item_status,
         oi.delivery_date,
-        
+        oi.latitude,
+    oi.longitude,
         oi.vendor_id,
 
         o.user_id,
-        o.latitude AS user_lat,     
-        o.longitude AS user_lng,   
-
+      
         p.title,
         v.business_name AS vendor_name
 
