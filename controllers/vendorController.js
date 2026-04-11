@@ -60,21 +60,21 @@ export const getVendorOrders = async (req, res) => {
     const vendorId = vendor.rows[0].id;
 
     const orders = await pool.query(
-      `SELECT 
-        o.id AS order_id,
-         oi.item_status,  
-      
-        o.created_at,
-        oi.quantity,
-        oi.vendor_earning,
-        p.title AS product_title
-      FROM order_items oi
-      JOIN orders o ON o.id = oi.order_id
-      LEFT JOIN products p ON p.id = oi.product_id
-      WHERE oi.vendor_id = $1
-      ORDER BY o.created_at DESC`,
-      [vendorId]
-    );
+  `SELECT 
+    oi.id AS item_id,       
+    o.id AS order_id,
+    oi.item_status,  
+    o.created_at,
+    oi.quantity,
+    oi.vendor_earning,
+    p.title AS product_title
+  FROM order_items oi
+  JOIN orders o ON o.id = oi.order_id
+  LEFT JOIN products p ON p.id = oi.product_id
+  WHERE oi.vendor_id = $1
+  ORDER BY o.created_at DESC`,
+  [vendorId]
+);
 
     res.json(orders.rows);
 
