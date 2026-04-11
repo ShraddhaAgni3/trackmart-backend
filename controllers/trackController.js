@@ -6,7 +6,7 @@ export const getItemTracking = async (req, res) => {
     const item = await pool.query(
       `
       SELECT 
-        oi.id,
+       oi.id AS item_id,
         oi.item_status,
         oi.delivery_date,
         oi.vendor_id,
