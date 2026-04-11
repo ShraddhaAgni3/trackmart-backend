@@ -83,3 +83,27 @@ export const getItemTracking = async (req, res) => {
     });
   }
 };
+// controllers/trackController.js
+
+export const updateLocation = async (req, res) => {
+  try {
+    const { item_id, lat, lng } = req.body;
+
+    if (!item_id || !lat || !lng) {
+      return res.status(400).json({ message: "Missing data" });
+    }
+
+    await pool.query(
+      `UPDATE order_items
+       SET latitude=$1, longitude=$2
+       WHERE id=$3`,
+      [lat, lng, item_id]
+    );
+
+    res.json({ message: "Location updated" });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: err.message });
+  }
+};
