@@ -12,7 +12,7 @@ export const getItemTracking = async (req, res) => {
         oi.vendor_id,
         o.user_id,
         p.title,
-        v.name AS vendor_name
+        v.business_name AS vendor_name
       FROM order_items oi
       JOIN orders o ON o.id = oi.order_id
       JOIN products p ON p.id = oi.product_id
