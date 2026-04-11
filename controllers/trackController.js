@@ -74,7 +74,9 @@ oi.longitude,
       status: data.item_status,
       delivery_date: data.delivery_date,
       vendor_name: data.vendor_name,
-      title: data.title
+      title: data.title,
+      latitude: data.latitude,      // 🔥 ADD
+  longitude: data.longitude   
     });
 
   } catch (err) {
