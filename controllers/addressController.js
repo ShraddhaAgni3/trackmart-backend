@@ -1,5 +1,5 @@
 import pool from "../config/db.js";
-import fetch from "node-fetch"; // agar node <18
+const geoRes = await fetch("https://...");
 /* ================= ADD ADDRESS ================= */
 export const addAddress = async (req, res) => {
   try {
