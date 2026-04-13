@@ -1,5 +1,5 @@
 import pool from "../config/db.js";
-const geoRes = await fetch("https://...");
+
 /* ================= ADD ADDRESS ================= */
 export const addAddress = async (req, res) => {
   try {
