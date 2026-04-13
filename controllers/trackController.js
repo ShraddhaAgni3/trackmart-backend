@@ -12,28 +12,35 @@ export const getItemTracking = async (req, res) => {
     }
 
     const result = await pool.query(
-      `
-      SELECT 
-        oi.id AS item_id,
-        oi.item_status,
-        oi.delivery_date,
-        oi.latitude,
-    oi.longitude,
-        oi.vendor_id,
-
-        o.user_id,
       
-        p.title,
-        v.business_name AS vendor_name
+     `
+  SELECT 
+    oi.id AS item_id,
+    oi.item_status,
+    oi.delivery_date,
+    oi.latitude,
+    oi.longitude,
+    oi.vendor_id,
 
-      FROM order_items oi
-      JOIN orders o ON o.id = oi.order_id
-      JOIN products p ON p.id = oi.product_id
-      JOIN vendors v ON v.id = oi.vendor_id
-      WHERE oi.id = $1
-      `,
-      [itemId]
-    );
+    o.user_id,
+    o.address_id,
+
+    a.latitude AS user_lat,   -- ✅ ADD
+    a.longitude AS user_lng,  -- ✅ ADD
+
+    p.title,
+    v.business_name AS vendor_name
+
+  FROM order_items oi
+  JOIN orders o ON o.id = oi.order_id
+  JOIN products p ON p.id = oi.product_id
+  JOIN vendors v ON v.id = oi.vendor_id
+LEFT JOIN addresses a ON a.id = o.address_id   -- 🔥 MAIN FIX
+
+  WHERE oi.id = $1
+  `,
+  [itemId]
+);
 
     // ❌ not found
     if (result.rows.length === 0) {
