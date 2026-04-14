@@ -381,16 +381,30 @@ res.status(500).json({message:err.message});
 
 };
 export const getVendorWeeklyEarnings = async (req,res)=>{
-
 try{
 
 const data = await pool.query(`
 SELECT
 v.id as vendor_id,
 v.business_name,
-COALESCE(SUM(oi.vendor_earning),0) as total_earning
+
+COALESCE(SUM(
+  CASE 
+    WHEN oi.payment_method='online'
+    THEN oi.vendor_earning
+    ELSE 0
+  END
+),0)
+-
+COALESCE(SUM(
+  CASE 
+    WHEN oi.payment_method='cod'
+    THEN (oi.price_at_purchase * oi.quantity) * 0.10
+    ELSE 0
+  END
+),0) as total_earning
+
 FROM order_items oi
-JOIN orders o ON oi.order_id = o.id
 JOIN vendors v ON oi.vendor_id = v.id
 WHERE
 oi.item_status='delivered'
@@ -404,23 +418,87 @@ res.json(data.rows);
 console.log(err);
 res.status(500).json({message:err.message});
 }
-
-};
-export const clearVendorPayment = async (req,res)=>{
-
+};export const clearVendorPayment = async (req,res)=>{
 try{
 
 const { vendorId } = req.params;
+const { reference } = req.body;
 
-await pool.query(`
-UPDATE order_items oi
-SET payout_status='paid'
-FROM orders o
-WHERE oi.order_id=o.id
-AND oi.vendor_id=$1
-AND oi.payout_status='pending'
-AND oi.item_status='delivered'
+if(!reference){
+return res.status(400).json({message:"Reference required"});
+}
+
+// 🔥 calculate earnings
+const data = await pool.query(`
+SELECT
+COALESCE(SUM(
+  CASE 
+    WHEN payment_method='online'
+    THEN vendor_earning
+    ELSE 0
+  END
+),0) as online_earning,
+
+COALESCE(SUM(
+  CASE 
+    WHEN payment_method='cod'
+    THEN (price_at_purchase * quantity) * 0.10
+    ELSE 0
+  END
+),0) as cod_commission
+
+FROM order_items
+WHERE vendor_id=$1
+AND item_status='delivered'
+AND payout_status='pending'
 `,[vendorId]);
+
+const online = Number(data.rows[0].online_earning);
+const cod = Number(data.rows[0].cod_commission);
+
+const final = online - cod;
+
+// 🔥 wallet update
+if(final >= 0){
+
+  await pool.query(`
+    INSERT INTO vendor_wallet (vendor_id,total_earnings,pending_amount,ready_for_payout)
+    VALUES($1,$2,0,0)
+    ON CONFLICT (vendor_id)
+    DO UPDATE SET
+      total_earnings = vendor_wallet.total_earnings + $2,
+      pending_amount = 0
+  `,[vendorId, final]);
+
+}else{
+
+  const due = Math.abs(final);
+
+  await pool.query(`
+    INSERT INTO vendor_wallet (vendor_id,total_earnings,pending_amount,ready_for_payout)
+    VALUES($1,0,$2,0)
+    ON CONFLICT (vendor_id)
+    DO UPDATE SET
+      pending_amount = vendor_wallet.pending_amount + $2
+  `,[vendorId, due]);
+
+  await pool.query(`
+    UPDATE vendors
+    SET kyc_status='hold'
+    WHERE id=$1
+  `,[vendorId]);
+}
+
+// 🔥 update items
+await pool.query(`
+UPDATE order_items
+SET 
+  payout_status='paid',
+  payout_reference=$1
+WHERE vendor_id=$2
+AND payout_status='pending'
+AND item_status='delivered'
+`,[reference, vendorId]);
 
 res.json({message:"Weekly payout cleared"});
 
@@ -428,7 +506,6 @@ res.json({message:"Weekly payout cleared"});
 console.log(err);
 res.status(500).json({message:err.message});
 }
-
 };
 export const getVendorDetails = async (req,res)=>{
 
