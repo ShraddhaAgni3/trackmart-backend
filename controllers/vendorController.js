@@ -408,36 +408,27 @@ return res.status(404).json({message:"Vendor not found"});
 const vendorId = vendor.rows[0].id;
 
 /* TOTAL RECEIVED */
-
-const received = await pool.query(
-`
+const received = await pool.query(`
 SELECT COALESCE(SUM(vendor_earning),0) as total
 FROM order_items
 WHERE vendor_id=$1
 AND payout_status='paid'
-`,
-[vendorId]
-);
+`,[vendorId]);
 
 /* TOTAL PENDING */
-
-const pending = await pool.query(
-`
+const pending = await pool.query(`
 SELECT COALESCE(SUM(vendor_earning),0) as total
 FROM order_items
 WHERE vendor_id=$1
 AND payout_status='pending'
-`,
-[vendorId]
-);
+`,[vendorId]);
 
 /* PAYMENT HISTORY */
-
-const history = await pool.query(
-`
+const history = await pool.query(`
 SELECT
 oi.vendor_earning,
 oi.payout_status,
+oi.payout_reference,   -- 🔥 ADDED
 o.created_at,
 p.title as product_title
 FROM order_items oi
@@ -445,22 +436,23 @@ JOIN orders o ON oi.order_id=o.id
 LEFT JOIN products p ON oi.product_id=p.id
 WHERE oi.vendor_id=$1
 ORDER BY o.created_at DESC
-`,
+`,[vendorId]);
+
+/* 🔥 WALLET (DUES) */
+const wallet = await pool.query(
+`SELECT pending_amount FROM vendor_wallet WHERE vendor_id=$1`,
 [vendorId]
 );
 
 res.json({
 received: received.rows[0].total,
 pending: pending.rows[0].total,
+dues: wallet.rows[0]?.pending_amount || 0,  // 🔥 ADDED
 history: history.rows
 });
 
-  
 }catch(err){
-
 console.log(err);
 res.status(500).json({message:err.message});
-
 }
-
 };
