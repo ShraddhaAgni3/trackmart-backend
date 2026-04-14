@@ -407,7 +407,7 @@ return res.status(404).json({message:"Vendor not found"});
 
 const vendorId = vendor.rows[0].id;
 
-/* TOTAL RECEIVED */
+/* TOTAL RECEIVED (paid payouts) */
 const received = await pool.query(`
 SELECT COALESCE(SUM(vendor_earning),0) as total
 FROM order_items
@@ -415,12 +415,23 @@ WHERE vendor_id=$1
 AND payout_status='paid'
 `,[vendorId]);
 
-/* TOTAL PENDING */
+/* TOTAL PENDING (ONLY ONLINE SHOULD COUNT) */
 const pending = await pool.query(`
 SELECT COALESCE(SUM(vendor_earning),0) as total
 FROM order_items
 WHERE vendor_id=$1
 AND payout_status='pending'
+AND commission_amount = 0   -- 🔥 ONLY ONLINE
+`,[vendorId]);
+
+/* 🔥 COD DUES (REAL FIX) */
+const codDue = await pool.query(`
+SELECT COALESCE(SUM(commission_amount),0) as total
+FROM order_items
+WHERE vendor_id=$1
+AND item_status='delivered'
+AND payout_status='pending'
+AND commission_amount > 0   -- 🔥 COD ONLY
 `,[vendorId]);
 
 /* PAYMENT HISTORY */
@@ -428,7 +439,7 @@ const history = await pool.query(`
 SELECT
 oi.vendor_earning,
 oi.payout_status,
-oi.payout_reference,   -- 🔥 ADDED
+oi.payout_reference,
 o.created_at,
 p.title as product_title
 FROM order_items oi
@@ -438,16 +449,13 @@ WHERE oi.vendor_id=$1
 ORDER BY o.created_at DESC
 `,[vendorId]);
 
-/* 🔥 WALLET (DUES) */
-const wallet = await pool.query(
-`SELECT pending_amount FROM vendor_wallet WHERE vendor_id=$1`,
-[vendorId]
-);
-
 res.json({
-received: received.rows[0].total,
-pending: pending.rows[0].total,
-dues: wallet.rows[0]?.pending_amount || 0,  // 🔥 ADDED
+received: Number(received.rows[0].total || 0),
+pending: Number(pending.rows[0].total || 0),
+
+// 🔥 REAL-TIME COD DUES
+dues: Number(codDue.rows[0].total || 0),
+
 history: history.rows
 });
 
