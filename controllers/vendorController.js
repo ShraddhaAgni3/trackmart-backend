@@ -9,6 +9,7 @@ export const getVendorStats = async (req, res) => {
       [req.user.id]
     );
 
+    
     if (!vendor.rows.length) {
       return res.status(404).json({ message: "Vendor not found" });
     }
