@@ -388,27 +388,19 @@ SELECT
 v.id as vendor_id,
 v.business_name,
 
-COALESCE(SUM(
-  CASE 
-    WHEN oi.payment_method='online'
-    THEN oi.vendor_earning
-    ELSE 0
-  END
-),0)
--
-COALESCE(SUM(
-  CASE 
-    WHEN oi.payment_method='cod'
-    THEN (oi.price_at_purchase * oi.quantity) * 0.10
-    ELSE 0
-  END
-),0) as total_earning
+-- 🔥 total earning after commission
+COALESCE(SUM(oi.vendor_earning),0) as total_earning,
+
+-- 🔥 total commission (COD ya jo bhi hai)
+COALESCE(SUM(oi.commission_amount),0) as commission
 
 FROM order_items oi
 JOIN vendors v ON oi.vendor_id = v.id
+
 WHERE
 oi.item_status='delivered'
 AND oi.payout_status='pending'
+
 GROUP BY v.id
 `);
 
@@ -418,7 +410,8 @@ res.json(data.rows);
 console.log(err);
 res.status(500).json({message:err.message});
 }
-};export const clearVendorPayment = async (req,res)=>{
+};
+export const clearVendorPayment = async (req,res)=>{
 try{
 
 const { vendorId } = req.params;
@@ -428,38 +421,24 @@ if(!reference){
 return res.status(400).json({message:"Reference required"});
 }
 
-// 🔥 calculate earnings
+// 🔥 get totals
 const data = await pool.query(`
 SELECT
-COALESCE(SUM(
-  CASE 
-    WHEN payment_method='online'
-    THEN vendor_earning
-    ELSE 0
-  END
-),0) as online_earning,
-
-COALESCE(SUM(
-  CASE 
-    WHEN payment_method='cod'
-    THEN (price_at_purchase * quantity) * 0.10
-    ELSE 0
-  END
-),0) as cod_commission
-
+COALESCE(SUM(vendor_earning),0) as total_earning,
+COALESCE(SUM(commission_amount),0) as total_commission
 FROM order_items
 WHERE vendor_id=$1
 AND item_status='delivered'
 AND payout_status='pending'
 `,[vendorId]);
 
-const online = Number(data.rows[0].online_earning);
-const cod = Number(data.rows[0].cod_commission);
+const earning = Number(data.rows[0].total_earning);
+const commission = Number(data.rows[0].total_commission);
 
-const final = online - cod;
+// 🔥 wallet logic
+if(earning >= commission){
 
-// 🔥 wallet update
-if(final >= 0){
+  const final = earning - commission;
 
   await pool.query(`
     INSERT INTO vendor_wallet (vendor_id,total_earnings,pending_amount,ready_for_payout)
@@ -472,7 +451,7 @@ if(final >= 0){
 
 }else{
 
-  const due = Math.abs(final);
+  const due = commission - earning;
 
   await pool.query(`
     INSERT INTO vendor_wallet (vendor_id,total_earnings,pending_amount,ready_for_payout)
@@ -489,12 +468,11 @@ if(final >= 0){
   `,[vendorId]);
 }
 
-// 🔥 update items
+// 🔥 mark items paid + reference
 await pool.query(`
 UPDATE order_items
-SET 
-  payout_status='paid',
-  payout_reference=$1
+SET payout_status='paid',
+    payout_reference=$1
 WHERE vendor_id=$2
 AND payout_status='pending'
 AND item_status='delivered'
