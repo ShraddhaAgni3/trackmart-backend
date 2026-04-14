@@ -388,11 +388,23 @@ SELECT
 v.id as vendor_id,
 v.business_name,
 
--- 🔥 total earning after commission
-COALESCE(SUM(oi.vendor_earning),0) as total_earning,
+-- 🔥 ONLINE payout only
+COALESCE(SUM(
+  CASE 
+    WHEN oi.commission_amount = 0
+    THEN oi.vendor_earning
+    ELSE 0
+  END
+),0) as total_earning,
 
--- 🔥 total commission (COD ya jo bhi hai)
-COALESCE(SUM(oi.commission_amount),0) as commission
+-- 🔥 COD commission (vendor owes platform)
+COALESCE(SUM(
+  CASE 
+    WHEN oi.commission_amount > 0
+    THEN oi.commission_amount
+    ELSE 0
+  END
+),0) as cod_due
 
 FROM order_items oi
 JOIN vendors v ON oi.vendor_id = v.id
