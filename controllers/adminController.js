@@ -422,39 +422,42 @@ res.json(data.rows);
 console.log(err);
 res.status(500).json({message:err.message});
 }
-};export const clearVendorPayment = async (req,res)=>{
+};
+export const clearVendorPayment = async (req,res)=>{
 try{
 
 const { vendorId } = req.params;
 const { reference } = req.body;
 
-// 🔥 1. ONLINE earnings (only full vendor money)
+// 🔥 ONLINE earnings
 const onlineRes = await pool.query(`
 SELECT COALESCE(SUM(vendor_earning),0) as total
 FROM order_items
 WHERE vendor_id=$1
 AND payout_status='pending'
 AND commission_amount = 0
+AND item_status='delivered'
 `,[vendorId]);
 
-// 🔥 2. COD dues (platform commission)
+// 🔥 COD dues
 const codRes = await pool.query(`
 SELECT COALESCE(SUM(commission_amount),0) as total
 FROM order_items
 WHERE vendor_id=$1
 AND payout_status='pending'
 AND commission_amount > 0
+AND item_status='delivered'
 `,[vendorId]);
 
 const onlineAmt = Number(onlineRes.rows[0].total || 0);
 const codDue = Number(codRes.rows[0].total || 0);
 
-// 🧠 SAFETY CHECK
+// 🧠 safety
 if(onlineAmt < 0 || codDue < 0){
   return res.status(400).json({message:"Invalid payout calculation"});
 }
 
-// 🔥 3. NET CALCULATION
+// 🔥 NET
 const finalPay = onlineAmt - codDue;
 
 let remainingDue = 0;
@@ -462,24 +465,29 @@ let remainingDue = 0;
 // ================= CASE 1 =================
 if(finalPay > 0){
 
-  // ✅ vendor ko paisa milega (ONLINE only)
+  // ✅ ONLINE → paid + reference
   await pool.query(`
   UPDATE order_items
-  SET payout_status='paid',
-      payout_reference=$1
+  SET 
+    payout_status='paid',
+    payout_reference=$1
   WHERE vendor_id=$2
   AND payout_status='pending'
   AND commission_amount = 0
+  AND item_status='delivered'
   `,[reference, vendorId]);
 
-  // ✅ COD → mark as adjusted (NOT paid ❗)
+  // ✅ COD → adjusted + SAME reference
   await pool.query(`
   UPDATE order_items
-  SET payout_status='adjusted'
-  WHERE vendor_id=$1
+  SET 
+    payout_status='adjusted',
+    payout_reference=$1
+  WHERE vendor_id=$2
   AND payout_status='pending'
   AND commission_amount > 0
-  `,[vendorId]);
+  AND item_status='delivered'
+  `,[reference, vendorId]);
 
 }
 
@@ -489,9 +497,8 @@ else{
   remainingDue = Math.abs(finalPay);
 
   // ❌ vendor ko kuch nahi milega
-  // ONLINE items bhi paid nahi honge
+  // COD bhi pending hi rahega
 
-  // 🔥 wallet me add karo
   await pool.query(`
   INSERT INTO vendor_wallet (vendor_id, pending_amount)
   VALUES($1,$2)
@@ -501,17 +508,9 @@ else{
 
 }
 
-// 🔥 OPTIONAL: reference update for paid ones
-await pool.query(`
-UPDATE order_items
-SET payout_reference=$1
-WHERE vendor_id=$2
-AND payout_status='paid'
-`,[reference, vendorId]);
-
 // ================= RESPONSE =================
 res.json({
-message:"Payout processed successfully",
+message:"Weekly payout processed",
 online: onlineAmt,
 cod: codDue,
 final: Math.max(0, finalPay),
