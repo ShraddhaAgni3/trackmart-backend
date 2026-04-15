@@ -429,68 +429,73 @@ try{
 const { vendorId } = req.params;
 const { reference } = req.body;
 
-if(!reference){
-return res.status(400).json({message:"Reference required"});
-}
-
-// 🔥 get totals
-const data = await pool.query(`
-SELECT
-COALESCE(SUM(vendor_earning),0) as total_earning,
-COALESCE(SUM(commission_amount),0) as total_commission
+// 🔥 ONLINE earnings
+const online = await pool.query(`
+SELECT COALESCE(SUM(vendor_earning),0) as total
 FROM order_items
 WHERE vendor_id=$1
-AND item_status='delivered'
 AND payout_status='pending'
+AND commission_amount = 0
 `,[vendorId]);
 
-const earning = Number(data.rows[0].total_earning);
-const commission = Number(data.rows[0].total_commission);
+// 🔥 COD dues
+const cod = await pool.query(`
+SELECT COALESCE(SUM(commission_amount),0) as total
+FROM order_items
+WHERE vendor_id=$1
+AND payout_status='pending'
+AND commission_amount > 0
+`,[vendorId]);
 
-// 🔥 wallet logic
-if(earning >= commission){
+const onlineAmt = Number(online.rows[0].total);
+const codDue = Number(cod.rows[0].total);
 
-  const final = earning - commission;
+// 🔥 FINAL CALCULATION
+const finalPay = onlineAmt - codDue;
 
+if(finalPay > 0){
+
+  // ✅ vendor ko paisa milega
   await pool.query(`
-    INSERT INTO vendor_wallet (vendor_id,total_earnings,pending_amount,ready_for_payout)
-    VALUES($1,$2,0,0)
-    ON CONFLICT (vendor_id)
-    DO UPDATE SET
-      total_earnings = vendor_wallet.total_earnings + $2,
-      pending_amount = 0
-  `,[vendorId, final]);
+  UPDATE order_items
+  SET payout_status='paid',
+      payout_reference=$1
+  WHERE vendor_id=$2
+  AND payout_status='pending'
+  AND commission_amount = 0
+  `,[reference, vendorId]);
+
+  // COD bhi settle
+  await pool.query(`
+  UPDATE order_items
+  SET payout_status='paid'
+  WHERE vendor_id=$1
+  AND payout_status='pending'
+  AND commission_amount > 0
+  `,[vendorId]);
 
 }else{
 
-  const due = commission - earning;
+  // ❌ vendor abhi bhi paisa deta hai
+  const remainingDue = Math.abs(finalPay);
 
   await pool.query(`
-    INSERT INTO vendor_wallet (vendor_id,total_earnings,pending_amount,ready_for_payout)
-    VALUES($1,0,$2,0)
-    ON CONFLICT (vendor_id)
-    DO UPDATE SET
-      pending_amount = vendor_wallet.pending_amount + $2
-  `,[vendorId, due]);
-
-  await pool.query(`
-    UPDATE vendors
-    SET kyc_status='hold'
-    WHERE id=$1
-  `,[vendorId]);
+  INSERT INTO vendor_wallet (vendor_id, pending_amount)
+  VALUES($1,$2)
+  ON CONFLICT (vendor_id)
+  DO UPDATE SET pending_amount = vendor_wallet.pending_amount + $2
+  `,[vendorId, remainingDue]);
 }
 
-// 🔥 mark items paid + reference
+// 🔥 history update
 await pool.query(`
 UPDATE order_items
-SET payout_status='paid',
-    payout_reference=$1
+SET payout_reference=$1
 WHERE vendor_id=$2
-AND payout_status='pending'
-AND item_status='delivered'
+AND payout_status='paid'
 `,[reference, vendorId]);
 
-res.json({message:"Weekly payout cleared"});
+res.json({message:"Payout processed with COD adjustment"});
 
 }catch(err){
 console.log(err);
