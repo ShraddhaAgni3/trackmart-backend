@@ -9,12 +9,16 @@ const razorpay = new Razorpay({
 /* CREATE ORDER */
 export const createOrder = async (req, res) => {
   try {
-    const { amount } = req.body;
+    const { amount, type } = req.body;
+
+    const receipt = type === "vendor_due"
+      ? `vendor_due_${req.user?.id}_${Date.now()}`
+      : `order_${Date.now()}`;
 
     const order = await razorpay.orders.create({
       amount: amount * 100,
       currency: "INR",
-      receipt: `receipt_${Date.now()}`
+      receipt
     });
 
     res.json({ success: true, order });
