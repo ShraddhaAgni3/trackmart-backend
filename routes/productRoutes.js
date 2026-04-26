@@ -20,14 +20,19 @@ router.get("/vendor", protect, getVendorProducts);
 router.get("/:id", getProductById);
 
 /* 🔥 IMAGE UPLOAD (NEW) */
-router.post(
-  "/upload-image",
-  protect,
-  upload.single("image"),
-  (req, res) => {
+router.post("/upload-image", protect, upload.single("image"), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
     res.json({ url: req.file.path });
+
+  } catch (err) {
+    console.log("UPLOAD ERROR:", err);
+    res.status(500).json({ message: "Upload failed" });
   }
-);
+});
 
 /* ✅ CREATE (LIGHTWEIGHT NOW) */
 router.post(
