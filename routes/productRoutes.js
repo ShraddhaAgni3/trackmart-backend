@@ -12,29 +12,31 @@ import { upload } from "../middleware/upload.js";
 
 const router = express.Router();
 
-/* ================= GET ALL PRODUCTS (WITH SEARCH) ================= */
+/* GET ALL PRODUCTS */
 router.get("/", getProducts);
-
 
 router.get("/vendor", protect, getVendorProducts);
 
-
 router.get("/:id", getProductById);
 
+/* 🔥 IMAGE UPLOAD (NEW) */
+router.post(
+  "/upload-image",
+  protect,
+  upload.single("image"),
+  (req, res) => {
+    res.json({ url: req.file.path });
+  }
+);
 
-/* CREATE */
+/* ✅ CREATE (LIGHTWEIGHT NOW) */
 router.post(
   "/",
   protect,
-  upload.fields([
-    { name: "product_image", maxCount: 1 },
-    { name: "ingredients_image", maxCount: 1 }
-  ]),
   createProduct
 );
 
 /* DELETE */
 router.delete("/:id", protect, deleteProduct);
-
 
 export default router;
