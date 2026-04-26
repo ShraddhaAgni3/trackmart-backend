@@ -136,15 +136,16 @@ export const getProducts = async (req, res) => {
 
 
 /* ================= CREATE PRODUCT ================= */
+import pool from "../config/db.js";
 
 export const createProduct = async (req, res) => {
-
   try {
-
+    // ✅ only vendors allowed
     if (req.user.role !== "vendor") {
       return res.status(403).json({ message: "Only vendors allowed" });
     }
 
+    // ✅ get data (INCLUDING IMAGE URLS)
     const {
       title,
       description,
@@ -160,27 +161,27 @@ export const createProduct = async (req, res) => {
       protein,
       ingredients,
       how_to_use = null,
-      making_process = null
+      making_process = null,
+      product_image,        // ✅ URL from frontend
+      ingredients_image     // ✅ URL from frontend
     } = req.body;
 
-    /* REQUIRED VALIDATION */
-
+    // ✅ validation
     if (!title || !price || !stock || !size) {
       return res.status(400).json({
         message: "Required fields missing"
       });
     }
 
+    // ✅ parsing
     const parsedPrice = Number(price);
     const parsedStock = Number(stock);
     const parsedCalories = calories ? Number(calories) : null;
     const parsedSugar = sugar ? Number(sugar) : null;
     const parsedFat = fat ? Number(fat) : null;
     const parsedProtein = protein ? Number(protein) : null;
-    const parsedSize = size;
 
-    /* HEALTH RATING */
-
+    // ✅ health logic
     let health_rating = "Healthy";
 
     if (
@@ -191,10 +192,9 @@ export const createProduct = async (req, res) => {
       health_rating = "Unhealthy";
     }
 
-    /* GET VENDOR */
-
+    // ✅ get vendor
     const vendor = await pool.query(
-      "SELECT id,business_name FROM vendors WHERE user_id=$1",
+      "SELECT id, business_name FROM vendors WHERE user_id=$1",
       [req.user.id]
     );
 
@@ -207,28 +207,20 @@ export const createProduct = async (req, res) => {
     const vendor_id = vendor.rows[0].id;
     const vendorName = vendor.rows[0].business_name;
 
-    /* IMAGE PATHS */
-
-    const product_image =
-      req.files?.product_image?.[0]?.path || null;
-
-    const ingredients_image =
-      req.files?.ingredients_image?.[0]?.path || null;
-
-    /* INSERT PRODUCT */
-
+    // ✅ insert product (FAST now)
     const product = await pool.query(
       `
       INSERT INTO products
-      (vendor_id,category_id,title,description,
-      price,stock,size,
-      calories,sugar,fat,protein,
-      care_type,concern_type,
-      ingredients,health_rating,
-      how_to_use,making_process,
-      image_url,ingredients_image_url)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
-      $11,$12,$13,$14,$15,$16,$17,$18,$19)
+      (vendor_id, category_id, title, description,
+       price, stock, size,
+       calories, sugar, fat, protein,
+       care_type, concern_type,
+       ingredients, health_rating,
+       how_to_use, making_process,
+       image_url, ingredients_image_url)
+      VALUES
+      ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+       $11,$12,$13,$14,$15,$16,$17,$18,$19)
       RETURNING *
       `,
       [
@@ -238,8 +230,7 @@ export const createProduct = async (req, res) => {
         description,
         parsedPrice,
         parsedStock,
-        parsedSize,
-      
+        size,
         parsedCalories,
         parsedSugar,
         parsedFat,
@@ -250,24 +241,22 @@ export const createProduct = async (req, res) => {
         health_rating,
         how_to_use,
         making_process,
-        product_image,
-        ingredients_image
+        product_image || null,        // ✅ URL
+        ingredients_image || null     // ✅ URL
       ]
     );
 
-    /* ================= ADMIN NOTIFICATION ================= */
-
+    // ✅ notify admins (optional - keep if needed)
     const admins = await pool.query(
       "SELECT id FROM users WHERE role='admin'"
     );
 
     for (const admin of admins.rows) {
-
       await pool.query(
         `
         INSERT INTO notifications
-        (user_id,title,message,type)
-        VALUES($1,$2,$3,$4)
+        (user_id, title, message, type)
+        VALUES ($1,$2,$3,$4)
         `,
         [
           admin.id,
@@ -276,18 +265,14 @@ export const createProduct = async (req, res) => {
           "product"
         ]
       );
-
     }
 
     res.json(product.rows[0]);
 
   } catch (err) {
-
     console.error(err);
     res.status(500).json({ message: err.message });
-
   }
-
 };
 
 
