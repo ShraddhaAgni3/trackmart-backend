@@ -26,7 +26,7 @@ router.post("/upload-image", protect, upload.single("image"), (req, res) => {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
-    res.json({ url: req.file.path });
+    return res.status(200).json({   url: req.file.path });
 
   } catch (err) {
     console.log("UPLOAD ERROR:", err);
