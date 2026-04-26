@@ -40,7 +40,30 @@ router.post(
   protect,
   createProduct
 );
+router.put("/:id", protect, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      title,
+      description,
+      price,
+      stock,
+      size
+    } = req.body;
 
+    await pool.query(
+      `UPDATE products 
+       SET title=$1, description=$2, price=$3, stock=$4, size=$5
+       WHERE id=$6`,
+      [title, description, price, stock, size, id]
+    );
+
+    res.json({ message: "Product updated" });
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 /* DELETE */
 router.delete("/:id", protect, deleteProduct);
 
