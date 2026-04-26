@@ -136,7 +136,7 @@ export const getProducts = async (req, res) => {
 
 
 /* ================= CREATE PRODUCT ================= */
-import pool from "../config/db.js";
+
 
 export const createProduct = async (req, res) => {
   try {
