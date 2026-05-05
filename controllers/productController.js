@@ -3,7 +3,7 @@ import xlsx from "xlsx";
 
 /* ================= COMMON INSERT FUNCTION ================= */
 
-const insertProduct = async (data, vendor_id) => {
+const createProduct = async (data, vendor_id) => {
 
   const {
     title,
