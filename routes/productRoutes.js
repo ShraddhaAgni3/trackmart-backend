@@ -11,9 +11,9 @@ import {
 import { protect } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js";
 import pool from "../config/db.js"; // ✅ FIX (missing import)
-
+import multer from "multer";
 const router = express.Router();
-
+const memoryUpload = multer(); 
 /* ================= GET ROUTES ================= */
 
 router.get("/", getProducts);
