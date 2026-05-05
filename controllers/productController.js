@@ -1,4 +1,99 @@
 import pool from "../config/db.js";
+import xlsx from "xlsx";
+
+/* ================= COMMON INSERT FUNCTION ================= */
+
+const insertProduct = async (data, vendor_id) => {
+
+  const {
+    title,
+    description,
+    price,
+    stock,
+    size,
+    category_id,
+    calories,
+    sugar,
+    fat,
+    protein,
+    care_type,
+    concern_type,
+    ingredients,
+    how_to_use,
+    making_process,
+    image_url,
+    ingredients_image_url
+  } = data;
+
+  if (!title || !price || !stock || !size) {
+    throw new Error("Missing required fields");
+  }
+
+  // duplicate check
+  const existing = await pool.query(
+    `SELECT id FROM products 
+     WHERE vendor_id=$1 
+     AND LOWER(title)=LOWER($2)
+     AND status='active'`,
+    [vendor_id, title]
+  );
+
+  if (existing.rows.length > 0) {
+    throw new Error("Duplicate product");
+  }
+
+  // health rating
+  let health_rating = "Healthy";
+  if (
+    (sugar && sugar > 20) ||
+    (fat && fat > 20) ||
+    (calories && calories > 500)
+  ) {
+    health_rating = "Unhealthy";
+  }
+
+  const product = await pool.query(
+    `
+    INSERT INTO products
+    (vendor_id,category_id,title,description,
+    price,stock,size,
+    calories,sugar,fat,protein,
+    care_type,concern_type,
+    ingredients,health_rating,
+    how_to_use,making_process,
+    image_url,ingredients_image_url)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+    $11,$12,$13,$14,$15,$16,$17,$18,$19)
+    RETURNING *
+    `,
+    [
+      vendor_id,
+      category_id,
+      title,
+      description,
+      Number(price),
+      Number(stock),
+      size,
+      calories || null,
+      sugar || null,
+      fat || null,
+      protein || null,
+      care_type,
+      concern_type,
+      ingredients,
+      health_rating,
+      how_to_use || null,
+      making_process || null,
+      image_url || null,
+      ingredients_image_url || null
+    ]
+  );
+
+  return product.rows[0];
+};
+
+/* ================= GET PRODUCT BY ID ================= */
+
 export const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -25,11 +120,12 @@ export const getProductById = async (req, res) => {
     res.json(product.rows[0]);
 
   } catch (err) {
-    console.log(err);
     res.status(500).json({ message: err.message });
   }
 };
+
 /* ================= GET PRODUCTS ================= */
+
 export const getProducts = async (req, res) => {
   try {
     const {
@@ -54,8 +150,6 @@ export const getProducts = async (req, res) => {
 
     let values = [];
     let index = 1;
-
-    /* FILTERS SAME AS YOUR CODE */
 
     if (search) {
       baseQuery += `
@@ -94,12 +188,10 @@ export const getProducts = async (req, res) => {
       index++;
     }
 
-    /* SORT */
     let orderBy = `ORDER BY p.created_at DESC`;
     if (sort === "price_low") orderBy = `ORDER BY p.price ASC`;
     if (sort === "price_high") orderBy = `ORDER BY p.price DESC`;
 
-    /* MAIN QUERY WITH LIMIT */
     const productsQuery = `
       SELECT 
         p.*,
@@ -117,7 +209,6 @@ export const getProducts = async (req, res) => {
       offset
     ]);
 
-    /* COUNT QUERY */
     const countQuery = `SELECT COUNT(*) ${baseQuery}`;
     const totalResult = await pool.query(countQuery, values);
 
@@ -129,69 +220,18 @@ export const getProducts = async (req, res) => {
     });
 
   } catch (err) {
-    console.log(err);
     res.status(500).json({ message: err.message });
   }
 };
 
-
-/* ================= CREATE PRODUCT ================= */
+/* ================= CREATE PRODUCT (SAFE) ================= */
 
 export const createProduct = async (req, res) => {
-
   try {
 
     if (req.user.role !== "vendor") {
       return res.status(403).json({ message: "Only vendors allowed" });
     }
-
-    const {
-      title,
-      description,
-      price,
-      stock,
-      size,
-      category_id,
-      calories,
-      care_type,
-      concern_type,
-      sugar,
-      fat,
-      protein,
-      ingredients,
-      how_to_use = null,
-      making_process = null
-    } = req.body;
-
-    /* REQUIRED VALIDATION */
-
-    if (!title || !price || !stock || !size) {
-      return res.status(400).json({
-        message: "Required fields missing"
-      });
-    }
-
-    const parsedPrice = Number(price);
-    const parsedStock = Number(stock);
-    const parsedCalories = calories ? Number(calories) : null;
-    const parsedSugar = sugar ? Number(sugar) : null;
-    const parsedFat = fat ? Number(fat) : null;
-    const parsedProtein = protein ? Number(protein) : null;
-    const parsedSize = size;
-
-    /* HEALTH RATING */
-
-    let health_rating = "Healthy";
-
-    if (
-      (parsedSugar && parsedSugar > 20) ||
-      (parsedFat && parsedFat > 20) ||
-      (parsedCalories && parsedCalories > 500)
-    ) {
-      health_rating = "Unhealthy";
-    }
-
-    /* GET VENDOR */
 
     const vendor = await pool.query(
       "SELECT id,business_name FROM vendors WHERE user_id=$1",
@@ -199,28 +239,11 @@ export const createProduct = async (req, res) => {
     );
 
     if (!vendor.rows.length) {
-      return res.status(400).json({
-        message: "Vendor profile missing"
-      });
+      return res.status(400).json({ message: "Vendor profile missing" });
     }
 
     const vendor_id = vendor.rows[0].id;
     const vendorName = vendor.rows[0].business_name;
-// 🔥 CHECK DUPLICATE PRODUCT
-const existingProduct = await pool.query(
-  `SELECT id FROM products 
-   WHERE vendor_id=$1 
-   AND LOWER(title)=LOWER($2)
-   AND status='active'`,
-  [vendor_id, title]
-);
-
-if (existingProduct.rows.length > 0) {
-  return res.status(400).json({
-    message: "Product already exists for this vendor"
-  });
-}
-    /* IMAGE PATHS */
 
     const product_image =
       req.files?.product_image?.[0]?.path || null;
@@ -228,86 +251,93 @@ if (existingProduct.rows.length > 0) {
     const ingredients_image =
       req.files?.ingredients_image?.[0]?.path || null;
 
-    /* INSERT PRODUCT */
+    const product = await insertProduct({
+      ...req.body,
+      image_url: product_image,
+      ingredients_image_url: ingredients_image
+    }, vendor_id);
 
-    const product = await pool.query(
-      `
-      INSERT INTO products
-      (vendor_id,category_id,title,description,
-      price,stock,size,
-      calories,sugar,fat,protein,
-      care_type,concern_type,
-      ingredients,health_rating,
-      how_to_use,making_process,
-      image_url,ingredients_image_url)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
-      $11,$12,$13,$14,$15,$16,$17,$18,$19)
-      RETURNING *
-      `,
-      [
-        vendor_id,
-        category_id,
-        title,
-        description,
-        parsedPrice,
-        parsedStock,
-        parsedSize,
-      
-        parsedCalories,
-        parsedSugar,
-        parsedFat,
-        parsedProtein,
-        care_type,
-        concern_type,
-        ingredients,
-        health_rating,
-        how_to_use,
-        making_process,
-        product_image,
-        ingredients_image
-      ]
-    );
-
-    /* ================= ADMIN NOTIFICATION ================= */
-
+    // admin notification
     const admins = await pool.query(
       "SELECT id FROM users WHERE role='admin'"
     );
 
     for (const admin of admins.rows) {
-
       await pool.query(
-        `
-        INSERT INTO notifications
+        `INSERT INTO notifications
         (user_id,title,message,type)
-        VALUES($1,$2,$3,$4)
-        `,
+        VALUES($1,$2,$3,$4)`,
         [
           admin.id,
           "New Product Added",
-          `${title} was added by vendor ${vendorName}`,
+          `${product.title} was added by vendor ${vendorName}`,
           "product"
         ]
       );
-
     }
 
-    res.json(product.rows[0]);
+    res.json(product);
 
   } catch (err) {
-
-    console.error(err);
     res.status(500).json({ message: err.message });
-
   }
-
 };
 
+/* ================= BULK UPLOAD ================= */
+
+export const bulkUploadProducts = async (req, res) => {
+  try {
+
+    if (req.user.role !== "vendor") {
+      return res.status(403).json({ message: "Only vendors allowed" });
+    }
+
+    const vendor = await pool.query(
+      "SELECT id FROM vendors WHERE user_id=$1",
+      [req.user.id]
+    );
+
+    const vendor_id = vendor.rows[0].id;
+
+    const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const data = xlsx.utils.sheet_to_json(sheet);
+
+    let success = 0;
+    let failed = [];
+
+    for (const item of data) {
+      try {
+        await insertProduct({
+          ...item,
+          image_url: item.product_image,
+          ingredients_image_url: item.ingredients_image
+        }, vendor_id);
+
+        success++;
+
+      } catch (err) {
+        failed.push({
+          title: item.title,
+          reason: err.message
+        });
+      }
+    }
+
+    res.json({
+      message: "Bulk upload completed",
+      success,
+      failed
+    });
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
 
 /* ================= GET VENDOR PRODUCTS ================= */
 
 export const getVendorProducts = async (req, res) => {
-
   try {
 
     const vendor = await pool.query(
@@ -315,45 +345,25 @@ export const getVendorProducts = async (req, res) => {
       [req.user.id]
     );
 
-    if (!vendor.rows.length) {
-      return res.status(400).json({ message: "Vendor not found" });
-    }
-
     const vendorId = vendor.rows[0].id;
 
     const products = await pool.query(
-      `
-      SELECT *
-      FROM products
-      WHERE vendor_id=$1
-      AND status='active'
-      ORDER BY created_at DESC
-      `,
+      `SELECT * FROM products
+       WHERE vendor_id=$1 AND status='active'
+       ORDER BY created_at DESC`,
       [vendorId]
     );
 
     res.json(products.rows);
 
   } catch (err) {
-
-    console.log(err);
-    if (err.code === "23505") {
-  return res.status(400).json({
-    message: "Duplicate product not allowed"
-  });
-}
-
-res.status(500).json({ message: err.message });
-
+    res.status(500).json({ message: err.message });
   }
-
 };
-
 
 /* ================= DELETE PRODUCT ================= */
 
 export const deleteProduct = async (req, res) => {
-
   try {
 
     const { id } = req.params;
@@ -362,10 +372,6 @@ export const deleteProduct = async (req, res) => {
       "SELECT id FROM vendors WHERE user_id=$1",
       [req.user.id]
     );
-
-    if (!vendor.rows.length) {
-      return res.status(403).json({ message: "Unauthorized" });
-    }
 
     const vendorId = vendor.rows[0].id;
 
@@ -377,10 +383,6 @@ export const deleteProduct = async (req, res) => {
     res.json({ message: "Product removed from store" });
 
   } catch (err) {
-
-    console.log(err);
     res.status(500).json({ message: err.message });
-
   }
-
 };
