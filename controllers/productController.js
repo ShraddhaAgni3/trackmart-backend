@@ -292,6 +292,13 @@ export const bulkUploadProducts = async (req, res) => {
       return res.status(403).json({ message: "Only vendors allowed" });
     }
 
+    // 🔥 IMPORTANT CHECK
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({
+        message: "File not received properly"
+      });
+    }
+
     const vendor = await pool.query(
       "SELECT id FROM vendors WHERE user_id=$1",
       [req.user.id]
@@ -302,6 +309,12 @@ export const bulkUploadProducts = async (req, res) => {
     const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const data = xlsx.utils.sheet_to_json(sheet);
+
+    if (!data.length) {
+      return res.status(400).json({
+        message: "Excel file is empty"
+      });
+    }
 
     let success = 0;
     let failed = [];
@@ -331,6 +344,7 @@ export const bulkUploadProducts = async (req, res) => {
     });
 
   } catch (err) {
+    console.log("BULK ERROR:", err); // 🔥 ADD THIS
     res.status(500).json({ message: err.message });
   }
 };
