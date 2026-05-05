@@ -27,7 +27,7 @@ router.get("/:id", getProductById);
 router.post(
   "/upload-image",
   protect,
-  upload.single("image"),
+ memoryUpload.single("file"),
   (req, res) => {
     try {
       if (!req.file) {
