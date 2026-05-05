@@ -1,6 +1,22 @@
 import pool from "../config/db.js";
 import xlsx from "xlsx";
 
+/* ================= HELPER ================= */
+
+const parseNumber = (value) => {
+  if (value === "" || value === undefined || value === null) {
+    return null; // ✅ allow null
+  }
+
+  const num = Number(value);
+
+  if (isNaN(num)) {
+    return null;
+  }
+
+  return num;
+};
+
 /* ================= COMMON INSERT FUNCTION ================= */
 
 const insertProduct = async (data, vendor_id) => {
@@ -45,9 +61,9 @@ const insertProduct = async (data, vendor_id) => {
   // health rating
   let health_rating = "Healthy";
   if (
-    (sugar && sugar > 20) ||
-    (fat && fat > 20) ||
-    (calories && calories > 500)
+    (parseNumber(sugar) || 0) > 20 ||
+    (parseNumber(fat) || 0) > 20 ||
+    (parseNumber(calories) || 0) > 500
   ) {
     health_rating = "Unhealthy";
   }
@@ -71,13 +87,13 @@ const insertProduct = async (data, vendor_id) => {
       category_id,
       title,
       description,
-      Number(price),
-      Number(stock),
+      parseNumber(price),
+      parseNumber(stock),
       size,
-      calories || null,
-      sugar || null,
-      fat || null,
-      protein || null,
+      parseNumber(calories),
+      parseNumber(sugar),
+      parseNumber(fat),
+      parseNumber(protein),
       care_type,
       concern_type,
       ingredients,
@@ -182,9 +198,9 @@ export const getProducts = async (req, res) => {
       index++;
     }
 
-    if (price) {
+    if (price && !isNaN(price)) {
       baseQuery += ` AND p.price <= $${index}`;
-      values.push(price);
+      values.push(Number(price));
       index++;
     }
 
@@ -224,7 +240,7 @@ export const getProducts = async (req, res) => {
   }
 };
 
-/* ================= CREATE PRODUCT (SAFE) ================= */
+/* ================= CREATE PRODUCT ================= */
 
 export const createProduct = async (req, res) => {
   try {
@@ -245,16 +261,10 @@ export const createProduct = async (req, res) => {
     const vendor_id = vendor.rows[0].id;
     const vendorName = vendor.rows[0].business_name;
 
-    const product_image =
-      req.files?.product_image?.[0]?.path || null;
-
-    const ingredients_image =
-      req.files?.ingredients_image?.[0]?.path || null;
-
     const product = await insertProduct({
       ...req.body,
-      image_url: product_image,
-      ingredients_image_url: ingredients_image
+      image_url: req.body.product_image,
+      ingredients_image_url: req.body.ingredients_image
     }, vendor_id);
 
     // admin notification
@@ -292,7 +302,6 @@ export const bulkUploadProducts = async (req, res) => {
       return res.status(403).json({ message: "Only vendors allowed" });
     }
 
-    // 🔥 IMPORTANT CHECK
     if (!req.file || !req.file.buffer) {
       return res.status(400).json({
         message: "File not received properly"
@@ -344,7 +353,7 @@ export const bulkUploadProducts = async (req, res) => {
     });
 
   } catch (err) {
-    console.log("BULK ERROR:", err); // 🔥 ADD THIS
+    console.log("BULK ERROR:", err);
     res.status(500).json({ message: err.message });
   }
 };
