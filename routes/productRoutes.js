@@ -4,42 +4,62 @@ import {
   getVendorProducts,
   deleteProduct,
   getProductById,
-  getProducts
+  getProducts,
+  bulkUploadProducts   // ✅ NEW
 } from "../controllers/productController.js";
 
 import { protect } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js";
+import pool from "../config/db.js"; // ✅ FIX (missing import)
 
 const router = express.Router();
 
-/* GET ALL PRODUCTS */
+/* ================= GET ROUTES ================= */
+
 router.get("/", getProducts);
 
 router.get("/vendor", protect, getVendorProducts);
 
 router.get("/:id", getProductById);
 
-/* 🔥 IMAGE UPLOAD (NEW) */
-router.post("/upload-image", protect, upload.single("image"), (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: "No file uploaded" });
-    }
+/* ================= IMAGE UPLOAD ================= */
 
-    return res.status(200).json({   url: req.file.path });
-
-  } catch (err) {
-    console.log("UPLOAD ERROR:", err);
-    res.status(500).json({ message: "Upload failed" });
-  }
-});
-
-/* ✅ CREATE (LIGHTWEIGHT NOW) */
 router.post(
-  "/",
+  "/upload-image",
   protect,
-  createProduct
+  upload.single("image"),
+  (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      return res.status(200).json({
+        url: req.file.path   // 👈 Cloudinary / local path
+      });
+
+    } catch (err) {
+      console.log("UPLOAD ERROR:", err);
+      res.status(500).json({ message: "Upload failed" });
+    }
+  }
 );
+
+/* ================= CREATE PRODUCT ================= */
+
+router.post("/", protect, createProduct);
+
+/* ================= 🔥 BULK UPLOAD ================= */
+
+router.post(
+  "/bulk-upload",
+  protect,
+  upload.single("file"),   // 👈 Excel file
+  bulkUploadProducts
+);
+
+/* ================= UPDATE PRODUCT ================= */
+
 router.put("/:id", protect, async (req, res) => {
   try {
     const { id } = req.params;
@@ -64,7 +84,9 @@ router.put("/:id", protect, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-/* DELETE */
+
+/* ================= DELETE PRODUCT ================= */
+
 router.delete("/:id", protect, deleteProduct);
 
 export default router;
